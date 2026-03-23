@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 import hmac, hashlib, time, requests, os
 import pandas as pd
 import numpy as np
+from datetime import datetime
 
 app = Flask(__name__)
 
@@ -10,10 +11,13 @@ API_SECRET     = os.environ.get("BINANCE_API_SECRET", "")
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "sinyal2024")
 KEY_VALUE  = float(os.environ.get("KEY_VALUE", "1"))
 ATR_PERIOD = int(os.environ.get("ATR_PERIOD", "10"))
-SYMBOL     = os.environ.get("SYMBOL", "BTCTRY")
-AMOUNT     = float(os.environ.get("AMOUNT", "100"))
-INTERVAL   = os.environ.get("INTERVAL", "1m")
-BASE_URL = "https://api.binance.tr"
+SYMBOL     = os.environ.get("SYMBOL", "COSTRY")
+AMOUNT     = float(os.environ.get("AMOUNT", "59000"))
+INTERVAL   = os.environ.get("INTERVAL", "30m")
+BASE_URL   = "https://api.binance.tr"
+
+bot_active = True
+trade_log = []
 
 def sign(params):
     query = "&".join(f"{k}={v}" for k, v in params.items())
@@ -27,7 +31,11 @@ def place_order(symbol, side, try_amount):
     params["signature"] = sign(params)
     headers = {"X-MBX-APIKEY": API_KEY}
     r = requests.post(f"{BASE_URL}/api/v3/order", params=params, headers=headers)
-    return r.json()
+    result = r.json()
+    trade_log.append({"time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "side": side.upper(), "symbol": symbol, "amount_try": try_amount, "price": price, "qty": qty, "result": result.get("status", str(result))})
+    if len(trade_log) > 200:
+        trade_log.pop(0)
+    return result
 
 def get_klines(symbol, interval, limit=100):
     r = requests.get(f"{BASE_URL}/api/v3/klines", params={"symbol": symbol, "interval": interval, "limit": limit})
@@ -73,6 +81,8 @@ last_signal = {"signal": None, "time": 0}
 
 def check_and_trade():
     global last_signal
+    if not bot_active:
+        return "DURDURULDU", {}
     try:
         df = get_klines(SYMBOL, INTERVAL, limit=max(ATR_PERIOD * 3, 100))
         buy, sell = calculate_ut_bot(df, KEY_VALUE, ATR_PERIOD)
@@ -93,28 +103,55 @@ def check_and_trade():
         print(f"[HATA] {e}")
         return "ERROR", {"error": str(e)}
 
+@app.route("/")
+def home():
+    durum = "AKTIF" if bot_active else "DURDURULDU"
+    rows = ""
+    for t in reversed(trade_log):
+        renk = "#2ecc71" if t["side"] == "BUY" else "#e74c3c"
+        rows += f"<tr><td>{t['time']}</td><td style='color:{renk};font-weight:bold'>{t['side']}</td><td>{t['symbol']}</td><td>{t['amount_try']:,.0f} TRY</td><td>{t['price']}</td><td>{t['qty']}</td><td>{t['result']}</td></tr>"
+    return f"""<html><head><meta charset='utf-8'><title>UT Bot</title>
+    <style>body{{background:#0d0f14;color:#e8eaf0;font-family:monospace;padding:20px}}
+    h2{{color:#4f8eff}}.badge{{padding:6px 16px;border-radius:20px;font-weight:bold}}
+    .aktif{{background:#1a3a1a;color:#2ecc71;border:1px solid #2ecc71}}
+    .dur{{background:#3a1a1a;color:#e74c3c;border:1px solid #e74c3c}}
+    .btn{{padding:10px 24px;border:none;border-radius:8px;cursor:pointer;font-size:14px;margin:8px 4px}}
+    .btn-dur{{background:#e74c3c;color:#fff}}.btn-bas{{background:#2ecc71;color:#000}}
+    table{{width:100%;border-collapse:collapse;margin-top:20px}}
+    th{{background:#1e2230;padding:10px;text-align:left;font-size:12px;color:#7a7f96}}
+    td{{padding:8px 10px;border-bottom:1px solid #1e2230;font-size:13px}}</style></head>
+    <body><h2>UT Bot — {SYMBOL}</h2>
+    <p>Durum: <span class='badge {"aktif" if bot_active else "dur"}'>{durum}</span></p>
+    <p>Coin: <b>{SYMBOL}</b> | Miktar: <b>{AMOUNT:,.0f} TRY</b> | Periyot: <b>{INTERVAL}</b></p>
+    <form method='post' action='/toggle' style='display:inline'>
+    <button class='btn {"btn-dur" if bot_active else "btn-bas"}'>{"Botu Durdur" if bot_active else "Botu Baslat"}</button>
+    </form>
+    <h3 style='margin-top:30px'>Islem Gecmisi ({len(trade_log)} islem)</h3>
+    <table><tr><th>Zaman</th><th>Sinyal</th><th>Coin</th><th>Tutar</th><th>Fiyat</th><th>Adet</th><th>Durum</th></tr>
+    {rows if rows else "<tr><td colspan='7' style='text-align:center;color:#7a7f96'>Henuz islem yok</td></tr>"}
+    </table></body></html>"""
+
+@app.route("/toggle", methods=["POST"])
+def toggle():
+    global bot_active
+    bot_active = not bot_active
+    return home()
+
+@app.route("/ping")
+def ping():
+    return "pong", 200
+
 @app.route("/check", methods=["GET"])
 def check():
     signal, result = check_and_trade()
     return jsonify({"signal": signal, "result": result})
 
-@app.route("/webhook", methods=["POST"])
-def webhook():
-    data = request.json or {}
-    if data.get("secret") != WEBHOOK_SECRET:
-        return {"error": "yetkisiz"}, 403
-    signal, result = check_and_trade()
-    return jsonify({"signal": signal, "result": result})
-
-@app.route("/")
-def home():
-    return "UT Bot calisiyor"
-
 import threading
 def auto_loop():
     while True:
         check_and_trade()
-        time.sleep(60)
+        time.sleep(1800)
+
 t = threading.Thread(target=auto_loop, daemon=True)
 t.start()
 
