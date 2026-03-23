@@ -150,7 +150,7 @@ import threading
 def auto_loop():
     while True:
         check_and_trade()
-        time.sleep(60)
+        time.sleep(10)
 
 t = threading.Thread(target=auto_loop, daemon=True)
 t.start()
