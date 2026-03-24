@@ -15,7 +15,7 @@ ATR_PERIOD = int(os.environ.get("ATR_PERIOD", "10"))
 SYMBOL     = os.environ.get("SYMBOL", "BTCTRY")
 AMOUNT     = float(os.environ.get("AMOUNT", "59000"))
 INTERVAL   = os.environ.get("INTERVAL", "30m")
-BASE_URL   = "https://api.binance.com"
+BASE_URL   = "https://api.binance.me"  # Binance TR API
 
 bot_active = True
 trade_log = []
