@@ -12,7 +12,7 @@ API_SECRET = os.environ.get("BINANCE_API_SECRET", "")
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "sinyal2024")
 KEY_VALUE  = float(os.environ.get("KEY_VALUE", "1"))
 ATR_PERIOD = int(os.environ.get("ATR_PERIOD", "10"))
-SYMBOL     = os.environ.get("SYMBOL", "BTCTRY")
+SYMBOL     = os.environ.get("SYMBOL", "COSTRY")
 AMOUNT     = float(os.environ.get("AMOUNT", "59000"))
 INTERVAL   = os.environ.get("INTERVAL", "30m")
 BASE_URL   = "https://api.binance.me"  # Binance TR API
@@ -27,12 +27,15 @@ def sign(params):
     return hmac.new(API_SECRET.encode(), query.encode(), hashlib.sha256).hexdigest()
 
 def place_order(symbol, side, try_amount):
+    # Anlık fiyat
     price_r = requests.get(f"{BASE_URL}/api/v3/ticker/price", params={"symbol": symbol})
     data = price_r.json()
     if "price" not in data:
         return {"status": "ERROR", "error": data.get("msg", "Fiyat yok")}
     price = float(data["price"])
     qty = round(try_amount / price, 6)
+
+    # Market order parametreleri
     params = {
         "symbol": symbol,
         "side": side.upper(),
@@ -44,6 +47,8 @@ def place_order(symbol, side, try_amount):
     headers = {"X-MBX-APIKEY": API_KEY}
     r = requests.post(f"{BASE_URL}/api/v3/order", params=params, headers=headers)
     result = r.json()
+
+    # Trade log
     trade_log.append({
         "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "side": side.upper(),
