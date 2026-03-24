@@ -91,7 +91,7 @@ def calculate_ut_bot(df, key_value=1, atr_period=10):
     buy = sell = False
     if len(src) >= 2:
         above = ema[-1] > xATR_ts[-1] and ema[-2] <= xATR_ts[-2]
-        below = xATR_ts[-1] > ema[-1] and xATR_ts[-2] <= ema[-2]
+        below = xATR_ts[-1] > ema[-1] and xATR_ts[-2] <= xATR_ts[-2]
         buy  = src[-1] > xATR_ts[-1] and above
         sell = src[-1] < xATR_ts[-1] and below
     return buy, sell
@@ -143,6 +143,7 @@ def home():
     for t in reversed(trade_log):
         renk = "#2ecc71" if t["side"] == "BUY" else "#e74c3c"
         rows += f"<tr><td>{t['time']}</td><td style='color:{renk};font-weight:bold'>{t['side']}</td><td>{t['symbol']}</td><td>{t['amount_try']:,.0f} TRY</td><td>{t['price']}</td><td>{t['qty']}</td><td>{t['result']}</td></tr>"
+
     return f"""<html><head><meta charset='utf-8'><title>UT Bot</title>
     <style>body{{background:#0d0f14;color:#e8eaf0;font-family:monospace;padding:20px}}
     h2{{color:#4f8eff}}.badge{{padding:6px 16px;border-radius:20px;font-weight:bold}}
@@ -153,5 +154,4 @@ def home():
     table{{width:100%;border-collapse:collapse;margin-top:20px}}
     th{{background:#1e2230;padding:10px;text-align:left;font-size:12px;color:#7a7f96}}
     td{{padding:8px 10px;border-bottom:1px solid #1e2230;font-size:13px}}</style></head>
-    <body><h2>UT Bot — {SYMBOL}</h2>
-    <p>Durum: <span class='badge {"
+    <body><h2>UT Bot — {SYMBOL}</h
