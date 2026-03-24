@@ -14,7 +14,7 @@ ATR_PERIOD = int(os.environ.get("ATR_PERIOD", "10"))
 SYMBOL     = os.environ.get("SYMBOL", "COSTRY")
 AMOUNT     = float(os.environ.get("AMOUNT", "59000"))
 INTERVAL   = os.environ.get("INTERVAL", "30m")
-BASE_URL   = "https://api.trbinance.com/"
+BASE_URL   = "https://api.trbinance.com"
 
 bot_active = True
 trade_log = []
