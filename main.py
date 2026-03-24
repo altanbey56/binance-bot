@@ -66,9 +66,16 @@ def get_klines(symbol, interval, limit=100):
     return df
 
 def calculate_ut_bot(df, key_value=1, atr_period=10):
+    if df.empty or len(df) < atr_period:
+        return False, False
+
     src = df["close"].values
     high = df["high"].values
     low  = df["low"].values
+
+    if len(src) < 2:
+        return False, False
+
     tr = np.maximum(high[1:] - low[1:], np.maximum(abs(high[1:] - src[:-1]), abs(low[1:] - src[:-1])))
     tr = np.insert(tr, 0, high[0] - low[0])
     atr = np.zeros(len(tr))
@@ -143,8 +150,10 @@ def home():
         renk = "#2ecc71" if t["side"] == "BUY" else "#e74c3c"
         rows += f"<tr><td>{t['time']}</td><td style='color:{renk};font-weight:bold'>{t['side']}</td><td>{t['symbol']}</td><td>{t['amount_try']:,.0f} TRY</td><td>{t['price']}</td><td>{t['qty']}</td><td>{t['result']}</td></tr>"
 
-    return f"""<html><head><meta charset='utf-8'><title>UT Bot</title>
-    <style>body{{background:#0d0f14;color:#e8eaf0;font-family:monospace;padding:20px}}
+    return f"""
+    <html><head><meta charset='utf-8'><title>UT Bot</title>
+    <style>
+    body{{background:#0d0f14;color:#e8eaf0;font-family:monospace;padding:20px}}
     h2{{color:#4f8eff}}.badge{{padding:6px 16px;border-radius:20px;font-weight:bold}}
     .aktif{{background:#1a3a1a;color:#2ecc71;border:1px solid #2ecc71}}
     .dur{{background:#3a1a1a;color:#e74c3c;border:1px solid #e74c3c}}
@@ -152,4 +161,8 @@ def home():
     .btn-dur{{background:#e74c3c;color:#fff}}.btn-bas{{background:#2ecc71;color:#000}}
     table{{width:100%;border-collapse:collapse;margin-top:20px}}
     th{{background:#1e2230;padding:10px;text-align:left;font-size:12px;color:#7a7f96}}
-    td{{padding:8px 10px;border-bottom:1px solid #1e2230;font-size:
+    td{{padding:8px 10px;border-bottom:1px solid #1e2230;font-size:13px}}
+    </style></head>
+    <body>
+    <h2>UT Bot — {SYMBOL}</h2>
+    <p>
