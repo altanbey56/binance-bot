@@ -91,7 +91,7 @@ def calculate_ut_bot(df, key_value=1, atr_period=10):
     buy = sell = False
     if len(src) >= 2:
         above = ema[-1] > xATR_ts[-1] and ema[-2] <= xATR_ts[-2]
-        below = xATR_ts[-1] > ema[-1] and xATR_ts[-2] <= xATR_ts[-2]
+        below = xATR_ts[-1] > ema[-1] and xATR_ts[-2] <= ema[-2]
         buy  = src[-1] > xATR_ts[-1] and above
         sell = src[-1] < xATR_ts[-1] and below
     return buy, sell
@@ -102,7 +102,6 @@ def check_and_trade():
         return "DURDURULDU", {}
 
     try:
-        # Anlık fiyatı çek
         price_r = requests.get(f"{BASE_URL}/api/v3/ticker/price", params={"symbol": SYMBOL})
         current_price = float(price_r.json()["price"])
         print(f"[FİYAT] {SYMBOL} anlık fiyat: {current_price}")
@@ -153,5 +152,4 @@ def home():
     .btn-dur{{background:#e74c3c;color:#fff}}.btn-bas{{background:#2ecc71;color:#000}}
     table{{width:100%;border-collapse:collapse;margin-top:20px}}
     th{{background:#1e2230;padding:10px;text-align:left;font-size:12px;color:#7a7f96}}
-    td{{padding:8px 10px;border-bottom:1px solid #1e2230;font-size:13px}}</style></head>
-    <body><h2>UT Bot — {SYMBOL}</h
+    td{{padding:8px 10px;border-bottom:1px solid #1e2230;font-size:
