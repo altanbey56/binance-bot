@@ -3,23 +3,25 @@ import hmac, hashlib, time, requests, os
 import pandas as pd
 import numpy as np
 from datetime import datetime
-import threading
 
 app = Flask(__name__)
 
+# ----------- AYARLAR -------------
 API_KEY        = os.environ.get("BINANCE_API_KEY", "")
 API_SECRET     = os.environ.get("BINANCE_API_SECRET", "")
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "sinyal2024")
-KEY_VALUE  = float(os.environ.get("KEY_VALUE", "1"))
-ATR_PERIOD = int(os.environ.get("ATR_PERIOD", "10"))
-SYMBOL     = os.environ.get("SYMBOL", "COSTRY")
-AMOUNT     = float(os.environ.get("AMOUNT", "59000"))
-INTERVAL   = os.environ.get("INTERVAL", "30m")
-BASE_URL   = "https://api.binance.me"
+KEY_VALUE      = float(os.environ.get("KEY_VALUE", "1"))
+ATR_PERIOD     = int(os.environ.get("ATR_PERIOD", "10"))
+SYMBOL         = os.environ.get("SYMBOL", "COSTRY")
+AMOUNT         = float(os.environ.get("AMOUNT", "59000"))
+INTERVAL       = os.environ.get("INTERVAL", "30m")
+BASE_URL       = "https://api.binance.me"
 
 bot_active = True
 trade_log = []
 last_signal = {"signal": None, "time": 0}
+
+# ----------- FONKSİYONLAR -------------
 
 def sign(params):
     query = "&".join(f"{k}={v}" for k, v in params.items())
@@ -142,6 +144,8 @@ def check_and_trade():
         print(f"[HATA] {e}")
         return "ERROR", {"error": str(e)}
 
+# ----------- FLASK ROUTES -------------
+
 @app.route("/")
 def home():
     durum = "AKTIF" if bot_active else "DURDURULDU"
@@ -165,4 +169,38 @@ def home():
     </style></head>
     <body>
     <h2>UT Bot — {SYMBOL}</h2>
-    <p>
+    <p>Durum: <span class="badge {'aktif' if bot_active else 'dur'}">{durum}</span></p>
+
+    <button class="btn btn-bas" onclick="fetch('/start').then(()=>location.reload())">BAŞLAT</button>
+    <button class="btn btn-dur" onclick="fetch('/stop').then(()=>location.reload())">DURDUR</button>
+
+    <table>
+    <tr><th>Zaman</th><th>İşlem</th><th>Sembol</th><th>Tutar</th><th>Fiyat</th><th>Adet</th><th>Sonuç</th></tr>
+    {rows}
+    </table>
+
+    </body></html>
+    """
+
+@app.route("/start")
+def start_bot():
+    global bot_active
+    bot_active = True
+    return jsonify({"status": "Bot başlatıldı"})
+
+@app.route("/stop")
+def stop_bot():
+    global bot_active
+    bot_active = False
+    return jsonify({"status": "Bot durduruldu"})
+
+@app.route("/check")
+def check():
+    durum, data = check_and_trade()
+    return jsonify({"status": durum, "data": data})
+
+# ----------- FLASK UYGULAMA BAŞLAT -------------
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
