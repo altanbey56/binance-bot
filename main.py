@@ -1,86 +1,70 @@
-import os
-import datetime
-from flask import Flask, request
+import ccxt
+import pandas as pd
+import numpy as np
+import time
 
-# OKX modüllerini doğru şekilde import et
-from okx.Trade import TradeAPI
-from okx.Account import AccountAPI
+# API YOK (test mod)
+exchange = ccxt.okx()
 
-# Environment değişkenlerinden OKX bilgilerini al
-API_KEY = os.getenv("OKX_API_KEY", "TESTKEY")
-API_SECRET = os.getenv("OKX_API_SECRET", "TESTSECRET")
-API_PASSPHRASE = os.getenv("OKX_API_PASSPHRASE", "TESTPASS")
+symbol = 'BTC/USDT'   # BTC/TRY dene, olmazsa bunu kullan
+timeframe = '1m'
 
-# OKX API nesnelerini oluştur
-tradeAPI = TradeAPI(API_KEY, API_SECRET, API_PASSPHRASE, False, "0")
-accountAPI = AccountAPI(API_KEY, API_SECRET, API_PASSPHRASE, False, "0")
+# ATR
+def ATR(df, period=10):
+    df['H-L'] = df['high'] - df['low']
+    df['H-PC'] = abs(df['high'] - df['close'].shift(1))
+    df['L-PC'] = abs(df['low'] - df['close'].shift(1))
+    df['TR'] = df[['H-L','H-PC','L-PC']].max(axis=1)
+    return df['TR'].rolling(period).mean()
 
-app = Flask(__name__)
-bot_active = False
+# UT BOT
+def UTBot(df, a=1, c=10):
+    df['ATR'] = ATR(df, c)
+    df['nLoss'] = a * df['ATR']
 
-def log_trade(action, symbol, qty, response):
-    with open("trade_logs.txt", "a") as f:
-        f.write(f"{datetime.datetime.now()} - {action} - {symbol} - {qty} - {response}\n")
+    trailing = [0]
 
-def buy(symbol, qty):
-    if API_KEY.startswith("TEST"):
-        response = {"mode": "TEST", "action": "BUY", "symbol": symbol, "qty": qty}
-    else:
-        response = tradeAPI.place_order(
-            instId=symbol,
-            tdMode="cash",
-            side="buy",
-            ordType="market",
-            sz=str(qty)
-        )
-    log_trade("BUY", symbol, qty, response)
-    return response
+    for i in range(1, len(df)):
+        prev = trailing[i-1]
+        price = df['close'][i]
 
-def sell(symbol, qty):
-    if API_KEY.startswith("TEST"):
-        response = {"mode": "TEST", "action": "SELL", "symbol": symbol, "qty": qty}
-    else:
-        response = tradeAPI.place_order(
-            instId=symbol,
-            tdMode="cash",
-            side="sell",
-            ordType="market",
-            sz=str(qty)
-        )
-    log_trade("SELL", symbol, qty, response)
-    return response
+        if price > prev:
+            trailing.append(max(prev, price - df['nLoss'][i]))
+        else:
+            trailing.append(min(prev, price + df['nLoss'][i]))
 
-@app.route("/start", methods=["POST"])
-def start_bot():
-    global bot_active
-    bot_active = True
-    return "Bot başlatıldı"
+    df['ts'] = trailing
 
-@app.route("/stop", methods=["POST"])
-def stop_bot():
-    global bot_active
-    bot_active = False
-    return "Bot durduruldu"
+    df['buy'] = (df['close'] > df['ts']) & (df['close'].shift(1) <= df['ts'].shift(1))
+    df['sell'] = (df['close'] < df['ts']) & (df['close'].shift(1) >= df['ts'].shift(1))
 
-@app.route("/signal", methods=["POST"])
-def signal():
-    global bot_active
-    if not bot_active:
-        return "Bot durdurulmuş durumda"
-    
-    data = request.json
-    action = data.get("action")
-    symbol = data.get("symbol")   # Örn: "BTC-TRY"
-    qty = data.get("qty")
-    
-    if action == "BUY":
-        response = buy(symbol, qty)
-    elif action == "SELL":
-        response = sell(symbol, qty)
-    else:
-        return "Geçersiz sinyal"
-    
-    return f"{action} emri gönderildi: {response}"
+    return df
 
-if __name__ == "__main__":
-    app.run(port=5000)
+# LOG
+def log(text):
+    with open("log.txt", "a") as f:
+        f.write(f"{time.ctime()} - {text}\n")
+
+print("BOT BASLADI...")
+
+while True:
+    try:
+        ohlcv = exchange.fetch_ohlcv(symbol, timeframe, limit=100)
+        df = pd.DataFrame(ohlcv, columns=['time','open','high','low','close','volume'])
+
+        df = UTBot(df)
+        last = df.iloc[-1]
+
+        if last['buy']:
+            print(f"BUY SIGNAL → Price: {last['close']}")
+            log(f"BUY SIGNAL | Price: {last['close']}")
+
+        elif last['sell']:
+            print(f"SELL SIGNAL → Price: {last['close']}")
+            log(f"SELL SIGNAL | Price: {last['close']}")
+
+        time.sleep(10)
+
+    except Exception as e:
+        print("HATA:", e)
+        time.sleep(5)
