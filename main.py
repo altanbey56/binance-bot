@@ -1,3 +1,21 @@
+import datetime
+from flask import Flask, request
+from okx import Trade, Account
+
+API_KEY = "SENIN_OKX_API_KEY"
+API_SECRET = "SENIN_OKX_API_SECRET"
+API_PASSPHRASE = "SENIN_OKX_API_PASSPHRASE"
+
+tradeAPI = Trade.TradeAPI(API_KEY, API_SECRET, API_PASSPHRASE, False, "0")
+accountAPI = Account.AccountAPI(API_KEY, API_SECRET, API_PASSPHRASE, False, "0")
+
+app = Flask(__name__)
+bot_active = False
+
+def log_trade(action, symbol, qty, response):
+    with open("trade_logs.txt", "a") as f:
+        f.write(f"{datetime.datetime.now()} - {action} - {symbol} - {qty} - {response}\n")
+
 def buy(symbol, qty):
     order = tradeAPI.place_order(instId=symbol, tdMode="cash", side="buy", ordType="market", sz=str(qty))
     log_trade("BUY", symbol, qty, order)
@@ -28,7 +46,7 @@ def signal():
     
     data = request.json
     action = data.get("action")
-    symbol = data.get("symbol")
+    symbol = data.get("symbol")   # Örn: "BTC-TRY", "ETH-TRY", "USDT-TRY"
     qty = data.get("qty")
     
     if action == "BUY":
