@@ -1,15 +1,19 @@
 import os
 import datetime
 from flask import Flask, request
-from okx import Trade, Account
+
+# OKX modüllerini doğru şekilde import et
+from okx.Trade import TradeAPI
+from okx.Account import AccountAPI
 
 # Environment değişkenlerinden OKX bilgilerini al
 API_KEY = os.getenv("OKX_API_KEY", "TESTKEY")
 API_SECRET = os.getenv("OKX_API_SECRET", "TESTSECRET")
 API_PASSPHRASE = os.getenv("OKX_API_PASSPHRASE", "TESTPASS")
 
-tradeAPI = Trade.TradeAPI(API_KEY, API_SECRET, API_PASSPHRASE, False, "0")
-accountAPI = Account.AccountAPI(API_KEY, API_SECRET, API_PASSPHRASE, False, "0")
+# OKX API nesnelerini oluştur
+tradeAPI = TradeAPI(API_KEY, API_SECRET, API_PASSPHRASE, False, "0")
+accountAPI = AccountAPI(API_KEY, API_SECRET, API_PASSPHRASE, False, "0")
 
 app = Flask(__name__)
 bot_active = False
@@ -22,7 +26,13 @@ def buy(symbol, qty):
     if API_KEY.startswith("TEST"):
         response = {"mode": "TEST", "action": "BUY", "symbol": symbol, "qty": qty}
     else:
-        response = tradeAPI.place_order(instId=symbol, tdMode="cash", side="buy", ordType="market", sz=str(qty))
+        response = tradeAPI.place_order(
+            instId=symbol,
+            tdMode="cash",
+            side="buy",
+            ordType="market",
+            sz=str(qty)
+        )
     log_trade("BUY", symbol, qty, response)
     return response
 
@@ -30,7 +40,13 @@ def sell(symbol, qty):
     if API_KEY.startswith("TEST"):
         response = {"mode": "TEST", "action": "SELL", "symbol": symbol, "qty": qty}
     else:
-        response = tradeAPI.place_order(instId=symbol, tdMode="cash", side="sell", ordType="market", sz=str(qty))
+        response = tradeAPI.place_order(
+            instId=symbol,
+            tdMode="cash",
+            side="sell",
+            ordType="market",
+            sz=str(qty)
+        )
     log_trade("SELL", symbol, qty, response)
     return response
 
