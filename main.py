@@ -1,68 +1,64 @@
-import ccxt
-import pandas as pd
-import numpy as np
 import time
+import random
 
-# Exchange (API yok, sadece veri çekme)
-exchange = ccxt.okx()
+# ----------------------------
+# BOT AYARLARI
+# ----------------------------
 
-# Symbol ve timeframe
-symbol = 'BTC/USDT'  # Önce USDT ile test et
-timeframe = '1m'
+SYMBOL = "BTC/USDT"       # Örnek coin
+INTERVAL = 60             # 60 saniyede bir veri çek
+LOG_FILE = "bot_log.txt"  # Log kaydı
 
-# ATR hesaplama fonksiyonu
-def ATR(df, period=10):
-    df['H-L'] = df['high'] - df['low']
-    df['H-PC'] = abs(df['high'] - df['close'].shift(1))
-    df['L-PC'] = abs(df['low'] - df['close'].shift(1))
-    df['TR'] = df[['H-L','H-PC','L-PC']].max(axis=1)
-    return df['TR'].rolling(period).mean()
+# ----------------------------
+# SAHTE VERİ / TEST
+# ----------------------------
 
-# UT BOT sinyal fonksiyonu
-def UTBot(df, a=1, c=10):
-    df['ATR'] = ATR(df, c)
-    df['nLoss'] = a * df['ATR']
+def get_fake_price():
+    """Fake fiyat verisi üretir"""
+    return round(random.uniform(65000, 66000), 2)
 
-    trailing = [0]
-    for i in range(1, len(df)):
-        prev = trailing[i-1]
-        price = df['close'][i]
-        if price > prev:
-            trailing.append(max(prev, price - df['nLoss'][i]))
-        else:
-            trailing.append(min(prev, price + df['nLoss'][i]))
-    df['ts'] = trailing
+# ----------------------------
+# ALIŞ / SATIŞ SİNYALİ
+# ----------------------------
 
-    df['buy'] = (df['close'] > df['ts']) & (df['close'].shift(1) <= df['ts'].shift(1))
-    df['sell'] = (df['close'] < df['ts']) & (df['close'].shift(1) >= df['ts'].shift(1))
-    return df
+def check_signal(price, last_signal):
+    """
+    Basit örnek: fiyat rastgele değişince alış/satış sinyali üret
+    """
+    if last_signal is None:
+        return "HİÇBİRİ"
+    if price > last_signal:
+        return "ALIŞ"
+    else:
+        return "SATIŞ"
 
-# Log fonksiyonu
-def log(text):
-    with open("log.txt", "a") as f:
-        f.write(f"{time.ctime()} - {text}\n")
+# ----------------------------
+# LOG YAZMA
+# ----------------------------
 
-print("BOT BASLADI...")
+def log_signal(signal, price):
+    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+    log_line = f"{timestamp} | Fiyat: {price} | Sinyal: {signal}"
+    print(log_line)
+    with open(LOG_FILE, "a") as f:
+        f.write(log_line + "\n")
 
-while True:
-    try:
-        print("Veri çekiliyor...")
-        ohlcv = exchange.fetch_ohlcv(symbol, timeframe, limit=100)
-        print("Veri geldi:", ohlcv[-1])  # En son barı göster
+# ----------------------------
+# ANA DÖNGÜ
+# ----------------------------
 
-        df = pd.DataFrame(ohlcv, columns=['time','open','high','low','close','volume'])
-        df = UTBot(df)
-        last = df.iloc[-1]
+def main():
+    print("BOT BASLADI...")
+    last_price = get_fake_price()
+    last_signal = None
 
-        if last['buy']:
-            print(f"BUY SIGNAL → Price: {last['close']}")
-            log(f"BUY SIGNAL | Price: {last['close']}")
-        elif last['sell']:
-            print(f"SELL SIGNAL → Price: {last['close']}")
-            log(f"SELL SIGNAL | Price: {last['close']}")
+    while True:
+        price = get_fake_price()
+        signal = check_signal(price, last_price)
+        log_signal(signal, price)
+        last_price = price
+        last_signal = signal
+        time.sleep(INTERVAL)
 
-        time.sleep(10)
-
-    except Exception as e:
-        print("HATA:", e)
-        time.sleep(5)
+if __name__ == "__main__":
+    main()
