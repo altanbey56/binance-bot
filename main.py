@@ -2,40 +2,38 @@ import time
 import random
 
 # ----------------------------
-# BOT AYARLARI
+# AYARLAR
 # ----------------------------
-
-SYMBOL = "BTC/USDT"       # Örnek coin
-INTERVAL = 60             # 60 saniyede bir veri çek
-LOG_FILE = "bot_log.txt"  # Log kaydı
+SYMBOL = "BTC/USDT"        # Örnek coin
+INTERVAL = 60              # Saniye cinsinden veri çekme aralığı
+LOG_FILE = "bot_log.txt"   # Log kaydı
 
 # ----------------------------
-# SAHTE VERİ / TEST
+# SAHTE API / FİYAT VERİSİ
 # ----------------------------
-
 def get_fake_price():
-    """Fake fiyat verisi üretir"""
+    """
+    Fake fiyat verisi üretir.
+    Test amaçlı: 65000-66000 arasında rastgele değer
+    """
     return round(random.uniform(65000, 66000), 2)
 
 # ----------------------------
-# ALIŞ / SATIŞ SİNYALİ
+# SİNYAL HESAPLAMA
 # ----------------------------
-
-def check_signal(price, last_signal):
-    """
-    Basit örnek: fiyat rastgele değişince alış/satış sinyali üret
-    """
-    if last_signal is None:
+def check_signal(price, last_price):
+    if last_price is None:
         return "HİÇBİRİ"
-    if price > last_signal:
+    if price > last_price:
         return "ALIŞ"
-    else:
+    elif price < last_price:
         return "SATIŞ"
+    else:
+        return "HİÇBİRİ"
 
 # ----------------------------
 # LOG YAZMA
 # ----------------------------
-
 def log_signal(signal, price):
     timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
     log_line = f"{timestamp} | Fiyat: {price} | Sinyal: {signal}"
@@ -46,18 +44,15 @@ def log_signal(signal, price):
 # ----------------------------
 # ANA DÖNGÜ
 # ----------------------------
-
 def main():
-    print("BOT BASLADI...")
-    last_price = get_fake_price()
-    last_signal = None
+    print("BOT BASLADI... (Fake API Testi, Web Service ortamında)")
+    last_price = None
 
     while True:
         price = get_fake_price()
         signal = check_signal(price, last_price)
         log_signal(signal, price)
         last_price = price
-        last_signal = signal
         time.sleep(INTERVAL)
 
 if __name__ == "__main__":
