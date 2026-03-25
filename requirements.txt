@@ -1,9 +1,6 @@
 flask
+gunicorn
 requests
 pandas
 numpy
-python-binance
-gunicorn
-flask
-gunicorn
-okx
+okx-python-sdk-api-v5
