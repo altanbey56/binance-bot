@@ -1,59 +1,80 @@
+import requests
+import pandas as pd
 import time
-import random
+import os
 
-# ----------------------------
-# AYARLAR
-# ----------------------------
-SYMBOL = "BTC/USDT"        # Örnek coin
-INTERVAL = 60              # Saniye cinsinden veri çekme aralığı
-LOG_FILE = "bot_log.txt"   # Log kaydı
+# Railway'den alır
+TOKEN = os.getenv("TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
 
-# ----------------------------
-# SAHTE API / FİYAT VERİSİ
-# ----------------------------
-def get_fake_price():
-    """
-    Fake fiyat verisi üretir.
-    Test amaçlı: 65000-66000 arasında rastgele değer
-    """
-    return round(random.uniform(65000, 66000), 2)
+symbol = "COSTRYUSDT"
+interval = "30m"
 
-# ----------------------------
-# SİNYAL HESAPLAMA
-# ----------------------------
-def check_signal(price, last_price):
-    if last_price is None:
-        return "HİÇBİRİ"
-    if price > last_price:
-        return "ALIŞ"
-    elif price < last_price:
-        return "SATIŞ"
-    else:
-        return "HİÇBİRİ"
+def send_telegram(message):
+    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
+    data = {
+        "chat_id": CHAT_ID,
+        "text": message
+    }
+    requests.post(url, data=data)
 
-# ----------------------------
-# LOG YAZMA
-# ----------------------------
-def log_signal(signal, price):
-    timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-    log_line = f"{timestamp} | Fiyat: {price} | Sinyal: {signal}"
-    print(log_line)
-    with open(LOG_FILE, "a") as f:
-        f.write(log_line + "\n")
+def get_data():
+    url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit=100"
+    data = requests.get(url).json()
+    
+    df = pd.DataFrame(data)
+    df = df.iloc[:, :6]
+    df.columns = ["time","open","high","low","close","volume"]
 
-# ----------------------------
-# ANA DÖNGÜ
-# ----------------------------
-def main():
-    print("BOT BASLADI... (Fake API Testi, Web Service ortamında)")
-    last_price = None
+    df["close"] = df["close"].astype(float)
+    df["high"] = df["high"].astype(float)
+    df["low"] = df["low"].astype(float)
 
-    while True:
-        price = get_fake_price()
-        signal = check_signal(price, last_price)
-        log_signal(signal, price)
-        last_price = price
-        time.sleep(INTERVAL)
+    return df
 
-if __name__ == "__main__":
-    main()
+def ut_bot(df, a=1, c=10):
+    df["ATR"] = df["high"] - df["low"]
+    df["nLoss"] = a * df["ATR"]
+
+    trailing_stop = [0]
+
+    for i in range(1, len(df)):
+        prev = trailing_stop[i-1]
+        price = df["close"][i]
+
+        if price > prev:
+            trailing_stop.append(max(prev, price - df["nLoss"][i]))
+        else:
+            trailing_stop.append(min(prev, price + df["nLoss"][i]))
+
+    df["TS"] = trailing_stop
+
+    df["buy"] = (df["close"] > df["TS"]) & (df["close"].shift(1) <= df["TS"].shift(1))
+    df["sell"] = (df["close"] < df["TS"]) & (df["close"].shift(1) >= df["TS"].shift(1))
+
+    return df
+
+last_signal = None
+
+# BOT BAŞLADI MESAJI
+send_telegram("🤖 BOT AKTİF 🚀")
+
+while True:
+    try:
+        df = get_data()
+        df = ut_bot(df)
+
+        last = df.iloc[-1]
+
+        if last["buy"] and last_signal != "buy":
+            send_telegram(f"🟢 AL Sinyali\nFiyat: {last['close']}")
+            last_signal = "buy"
+
+        elif last["sell"] and last_signal != "sell":
+            send_telegram(f"🔴 SAT Sinyali\nFiyat: {last['close']}")
+            last_signal = "sell"
+
+    except Exception as e:
+        send_telegram(f"Hata: {e}")
+
+    time.sleep(60)
